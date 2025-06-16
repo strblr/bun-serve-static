@@ -1,24 +1,29 @@
 import { file as bunFile } from "bun";
 import path from "path";
 
-export function serveStatic(root: string, index?: string) {
+export function serveStatic(
+  root: string,
+  fallback?: string | ((req: Request) => Response | Promise<Response>)
+) {
   root = path.resolve(root);
-  index = index && path.join(root, index);
+  fallback =
+    typeof fallback === "string" ? path.join(root, fallback) : fallback;
 
-  const indexOrNull = async () => {
-    if (!index) return null;
-    const file = bunFile(index);
+  const fallbackOrNull = async (req: Request) => {
+    if (!fallback) return null;
+    if (typeof fallback === "function") return fallback(req);
+    const file = bunFile(fallback);
     if (!(await file.exists())) return null;
     return new Response(file);
   };
 
   return async (req: Request) => {
     const filePath = decodeUriDeep(new URL(req.url).pathname);
-    if (!filePath) return indexOrNull();
+    if (!filePath) return fallbackOrNull(req);
     const absolutePath = path.join(root, filePath);
-    if (!absolutePath.startsWith(root)) return indexOrNull();
+    if (!absolutePath.startsWith(root)) return fallbackOrNull(req);
     const file = bunFile(absolutePath);
-    if (!(await file.exists())) return indexOrNull();
+    if (!(await file.exists())) return fallbackOrNull(req);
     return new Response(file);
   };
 }

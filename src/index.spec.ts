@@ -132,3 +132,80 @@ test("serveStatic returns null for malformed URIs", async () => {
 
   await rm(testDir, { recursive: true });
 });
+
+test("serveStatic uses fallback function when file doesn't exist", async () => {
+  const testDir = path.join(__dirname, "test-static");
+
+  await mkdir(testDir, { recursive: true });
+
+  const fallbackHandler = (req: Request) => {
+    return new Response("Custom fallback response");
+  };
+
+  const handler = serveStatic(testDir, fallbackHandler);
+  const req = new Request("http://localhost/nonexistent.txt");
+  const response = await handler(req);
+
+  expect(response).toBeInstanceOf(Response);
+  expect(await response?.text()).toBe("Custom fallback response");
+
+  await rm(testDir, { recursive: true });
+});
+
+test("serveStatic uses fallback function when path is outside root", async () => {
+  const testDir = path.join(__dirname, "test-static");
+
+  await mkdir(testDir, { recursive: true });
+
+  const fallbackHandler = (req: Request) => {
+    return new Response("Security fallback");
+  };
+
+  const handler = serveStatic(testDir, fallbackHandler);
+  const req = new Request("http://localhost/../secret.txt");
+  const response = await handler(req);
+
+  expect(response).toBeInstanceOf(Response);
+  expect(await response?.text()).toBe("Security fallback");
+
+  await rm(testDir, { recursive: true });
+});
+
+test("serveStatic uses async fallback function", async () => {
+  const testDir = path.join(__dirname, "test-static");
+
+  await mkdir(testDir, { recursive: true });
+
+  const fallbackHandler = async (req: Request) => {
+    return new Response("Async fallback response");
+  };
+
+  const handler = serveStatic(testDir, fallbackHandler);
+  const req = new Request("http://localhost/nonexistent.txt");
+  const response = await handler(req);
+
+  expect(response).toBeInstanceOf(Response);
+  expect(await response?.text()).toBe("Async fallback response");
+
+  await rm(testDir, { recursive: true });
+});
+
+test("serveStatic passes request to fallback function", async () => {
+  const testDir = path.join(__dirname, "test-static");
+
+  await mkdir(testDir, { recursive: true });
+
+  const fallbackHandler = (req: Request) => {
+    const url = new URL(req.url);
+    return new Response(`Fallback for: ${url.pathname}`);
+  };
+
+  const handler = serveStatic(testDir, fallbackHandler);
+  const req = new Request("http://localhost/missing/file.txt");
+  const response = await handler(req);
+
+  expect(response).toBeInstanceOf(Response);
+  expect(await response?.text()).toBe("Fallback for: /missing/file.txt");
+
+  await rm(testDir, { recursive: true });
+});
