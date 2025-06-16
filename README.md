@@ -21,7 +21,7 @@ Bun.serve({
 });
 ```
 
-### 2. Serve a directory and fall back to a file (e.g. `index.html`)
+### 2. Fall back to a file (e.g. `index.html`)
 
 Passing a file path as second argument tells the handler to serve that file whenever the requested
 asset cannot be found or the request falls outside the configured root.
