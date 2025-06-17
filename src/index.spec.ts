@@ -27,7 +27,7 @@ test("serveStatic serves index file when no path specified", async () => {
   await mkdir(testDir, { recursive: true });
   await writeFile(indexFile, "<h1>Index Page</h1>");
 
-  const handler = serveStatic(testDir, "index.html");
+  const handler = serveStatic(testDir, { fallback: "index.html" });
   const req = new Request("http://localhost/");
   const response = await handler(req);
 
@@ -44,7 +44,7 @@ test("serveStatic returns index when file doesn't exist", async () => {
   await mkdir(testDir, { recursive: true });
   await writeFile(indexFile, "<h1>Index Page</h1>");
 
-  const handler = serveStatic(testDir, "index.html");
+  const handler = serveStatic(testDir, { fallback: "index.html" });
   const req = new Request("http://localhost/nonexistent.txt");
   const response = await handler(req);
 
@@ -142,7 +142,7 @@ test("serveStatic uses fallback function when file doesn't exist", async () => {
     return new Response("Custom fallback response");
   };
 
-  const handler = serveStatic(testDir, fallbackHandler);
+  const handler = serveStatic(testDir, { fallback: fallbackHandler });
   const req = new Request("http://localhost/nonexistent.txt");
   const response = await handler(req);
 
@@ -161,7 +161,7 @@ test("serveStatic uses fallback function when path is outside root", async () =>
     return new Response("Security fallback");
   };
 
-  const handler = serveStatic(testDir, fallbackHandler);
+  const handler = serveStatic(testDir, { fallback: fallbackHandler });
   const req = new Request("http://localhost/../secret.txt");
   const response = await handler(req);
 
@@ -180,7 +180,7 @@ test("serveStatic uses async fallback function", async () => {
     return new Response("Async fallback response");
   };
 
-  const handler = serveStatic(testDir, fallbackHandler);
+  const handler = serveStatic(testDir, { fallback: fallbackHandler });
   const req = new Request("http://localhost/nonexistent.txt");
   const response = await handler(req);
 
@@ -200,12 +200,50 @@ test("serveStatic passes request to fallback function", async () => {
     return new Response(`Fallback for: ${url.pathname}`);
   };
 
-  const handler = serveStatic(testDir, fallbackHandler);
+  const handler = serveStatic(testDir, { fallback: fallbackHandler });
   const req = new Request("http://localhost/missing/file.txt");
   const response = await handler(req);
 
   expect(response).toBeInstanceOf(Response);
   expect(await response?.text()).toBe("Fallback for: /missing/file.txt");
+
+  await rm(testDir, { recursive: true });
+});
+
+test("serveStatic uses mapping to redirect paths", async () => {
+  const testDir = path.join(__dirname, "test-static");
+  const testFile = path.join(testDir, "actual-file.txt");
+
+  await mkdir(testDir, { recursive: true });
+  await writeFile(testFile, "Mapped content");
+
+  const handler = serveStatic(testDir, {
+    mapping: {
+      "/api/data": "/actual-file.txt",
+      "/old-path": "/actual-file.txt"
+    }
+  });
+
+  // Test first mapping
+  const req1 = new Request("http://localhost/api/data");
+  const response1 = await handler(req1);
+
+  expect(response1).toBeInstanceOf(Response);
+  expect(await response1?.text()).toBe("Mapped content");
+
+  // Test second mapping
+  const req2 = new Request("http://localhost/old-path");
+  const response2 = await handler(req2);
+
+  expect(response2).toBeInstanceOf(Response);
+  expect(await response2?.text()).toBe("Mapped content");
+
+  // Test unmapped path still works normally
+  const req3 = new Request("http://localhost/actual-file.txt");
+  const response3 = await handler(req3);
+
+  expect(response3).toBeInstanceOf(Response);
+  expect(await response3?.text()).toBe("Mapped content");
 
   await rm(testDir, { recursive: true });
 });

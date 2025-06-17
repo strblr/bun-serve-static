@@ -1,9 +1,14 @@
 import { file as bunFile } from "bun";
 import path from "path";
 
+export interface ServeStaticOptions {
+  fallback?: string | ((req: Request) => Response | Promise<Response>);
+  mapping?: Record<string, string>;
+}
+
 export function serveStatic(
   root: string,
-  fallback?: string | ((req: Request) => Response | Promise<Response>)
+  { fallback, mapping }: ServeStaticOptions = {}
 ) {
   root = path.resolve(root);
   fallback =
@@ -18,7 +23,9 @@ export function serveStatic(
   };
 
   return async (req: Request) => {
-    const filePath = decodeUriDeep(new URL(req.url).pathname);
+    const { pathname } = new URL(req.url);
+    const mappedPathname = mapping?.[pathname] ?? pathname;
+    const filePath = decodeUriDeep(mappedPathname);
     if (!filePath) return fallbackOrNull(req);
     const absolutePath = path.join(root, filePath);
     if (!absolutePath.startsWith(root)) return fallbackOrNull(req);
